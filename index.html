@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="TopoTransform is a production-grade 3D to 2D orthographic topography engine built with pure linear algebra and the HTML5 Canvas 2D API."
+    />
+    <title>TopoTransform</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <canvas id="viewport" class="viewport" aria-label="TopoTransform rendering viewport"></canvas>
+
+      <header class="topbar">
+        <div class="topbar__brand">
+          <div class="brand-mark" aria-hidden="true">T</div>
+          <div class="brand-copy">
+            <div class="brand-row">
+              <h1>TopoTransform</h1>
+              <span class="pill">v1.0.0</span>
+              <span class="pill pill--ghost">Orthographic Engine</span>
+            </div>
+            <p>Professional 3D to 2D topography mapping with a pure software pipeline.</p>
+          </div>
+        </div>
+
+        <div class="topbar__actions">
+          <button id="theme-toggle" class="icon-button" type="button" aria-pressed="false" title="Toggle light and dark mode">
+            <span class="icon-button__glyph">◐</span>
+          </button>
+          <button id="fit-view-button" class="icon-button" type="button" title="Fit model to view">
+            <span class="icon-button__glyph">⌖</span>
+          </button>
+          <button id="export-button" class="button button-primary" type="button">Export PNG</button>
+        </div>
+      </header>
+
+      <aside class="side-panel" aria-label="Controls">
+        <section class="panel-card">
+          <div class="section-heading">
+            <p class="eyebrow">Upload Model</p>
+            <h2>OBJ Ingestion</h2>
+          </div>
+
+          <label id="drop-zone" class="drop-zone" for="file-input">
+            <input id="file-input" type="file" accept=".obj" />
+            <span class="drop-zone__icon">⇪</span>
+            <span class="drop-zone__title">Drag and drop an OBJ file</span>
+            <span class="drop-zone__body">
+              Vertices and polygonal faces are parsed, quads and n-gons are triangulated, and the mesh is normalized for stable orthographic rendering.
+            </span>
+            <span id="drop-zone-status" class="drop-zone__status">No model loaded</span>
+          </label>
+
+          <div class="button-row">
+            <button id="browse-button" class="button button-secondary" type="button">Browse File</button>
+            <button id="clear-scene-button" class="button button-secondary" type="button">Clear Scene</button>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="section-heading">
+            <p class="eyebrow">Render Mode</p>
+            <h2>Visualization</h2>
+          </div>
+
+          <div class="control-grid">
+            <label class="field">
+              <span class="field__label">Mode</span>
+              <select id="render-mode">
+                <option value="heatmap">Heatmap</option>
+                <option value="solid">Solid Fill</option>
+                <option value="wireframe">Wireframe</option>
+                <option value="points">Point Cloud</option>
+                <option value="hiddenline">Hidden Line Removal</option>
+                <option value="depth">Depth Shading</option>
+                <option value="contour">Contour Lines</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Point Size
+                <strong id="point-size-value">2.0 px</strong>
+              </span>
+              <input id="point-size-slider" type="range" min="1" max="6" step="0.1" value="2" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Surface Opacity
+                <strong id="opacity-value">1.00</strong>
+              </span>
+              <input id="opacity-slider" type="range" min="0.1" max="1" step="0.01" value="1" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Contour Density
+                <strong id="contour-density-value">12</strong>
+              </span>
+              <input id="contour-density-slider" type="range" min="4" max="28" step="1" value="12" />
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="section-heading">
+            <p class="eyebrow">View &amp; Camera</p>
+            <h2>Transform Controls</h2>
+          </div>
+
+          <div class="control-grid">
+            <label class="field">
+              <span class="field__label">Preset</span>
+              <select id="camera-preset">
+                <option value="iso">Custom Isometric</option>
+                <option value="top">Top</option>
+                <option value="front">Front</option>
+                <option value="side">Side</option>
+              </select>
+            </label>
+
+            <div class="button-row button-row--tight">
+              <button id="save-view-button" class="button button-secondary" type="button">Save View</button>
+              <button id="reset-view-button" class="button button-secondary" type="button">Reset View</button>
+            </div>
+
+            <label class="field">
+              <span class="field__label">
+                Rotate X
+                <strong id="rotate-x-value">-23&deg;</strong>
+              </span>
+              <input id="rotate-x" type="range" min="-180" max="180" step="1" value="-23" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Rotate Y
+                <strong id="rotate-y-value">-35&deg;</strong>
+              </span>
+              <input id="rotate-y" type="range" min="-180" max="180" step="1" value="-35" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Rotate Z
+                <strong id="rotate-z-value">12&deg;</strong>
+              </span>
+              <input id="rotate-z" type="range" min="-180" max="180" step="1" value="12" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Zoom
+                <strong id="zoom-value">1.25x</strong>
+              </span>
+              <input id="zoom-slider" type="range" min="0.35" max="3" step="0.01" value="1.25" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Pan X
+                <strong id="pan-x-value">0.00</strong>
+              </span>
+              <input id="pan-x-slider" type="range" min="-2" max="2" step="0.01" value="0" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Pan Y
+                <strong id="pan-y-value">0.00</strong>
+              </span>
+              <input id="pan-y-slider" type="range" min="-2" max="2" step="0.01" value="0" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">
+                Vertical Exaggeration
+                <strong id="z-scale-value">1.00x</strong>
+              </span>
+              <input id="z-scale-slider" type="range" min="0.2" max="12" step="0.05" value="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="section-heading">
+            <p class="eyebrow">Visual Options</p>
+            <h2>Helpers &amp; Diagnostics</h2>
+          </div>
+
+          <div class="toggle-grid">
+            <label class="toggle">
+              <input id="grid-toggle" type="checkbox" checked />
+              <span>Show Grid</span>
+            </label>
+            <label class="toggle">
+              <input id="axes-toggle" type="checkbox" checked />
+              <span>Show Axes</span>
+            </label>
+            <label class="toggle">
+              <input id="bbox-toggle" type="checkbox" />
+              <span>Show Bounding Box</span>
+            </label>
+            <label class="toggle">
+              <input id="normals-toggle" type="checkbox" />
+              <span>Show Normals</span>
+            </label>
+            <label class="toggle">
+              <input id="culling-toggle" type="checkbox" checked />
+              <span>Backface Culling</span>
+            </label>
+            <label class="toggle">
+              <input id="adaptive-toggle" type="checkbox" checked />
+              <span>Adaptive Rendering</span>
+            </label>
+            <label class="toggle">
+              <input id="heatmap-interpolation-toggle" type="checkbox" checked />
+              <span>Interpolated Heatmap</span>
+            </label>
+            <label class="toggle">
+              <input id="export-ui-toggle" type="checkbox" />
+              <span>Export With UI</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="section-heading">
+            <p class="eyebrow">Metadata</p>
+            <h2>Mesh Analytics</h2>
+          </div>
+
+          <div class="metadata-grid">
+            <article class="metric-card">
+              <span class="metric-card__label">Vertices</span>
+              <strong id="meta-vertices">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-card__label">Faces</span>
+              <strong id="meta-faces">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-card__label">Triangles</span>
+              <strong id="meta-triangles">0</strong>
+            </article>
+            <article class="metric-card metric-card--wide">
+              <span class="metric-card__label">Bounds</span>
+              <strong id="meta-bounds">Min (0, 0, 0) · Max (0, 0, 0)</strong>
+            </article>
+          </div>
+
+          <div class="warnings-block">
+            <span class="warnings-block__label">Validation</span>
+            <ul id="warning-list" class="warning-list">
+              <li>No validation warnings.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <div class="section-heading">
+            <p class="eyebrow">Snapshots</p>
+            <h2>Saved Views</h2>
+          </div>
+          <div id="snapshot-list" class="snapshot-list">
+            <p class="snapshot-list__empty">No saved views yet.</p>
+          </div>
+        </section>
+      </aside>
+
+      <aside class="legend-panel">
+        <section class="legend-card">
+          <div class="legend-card__header">
+            <p class="eyebrow">Elevation (Z)</p>
+            <h2>Heatmap Legend</h2>
+          </div>
+          <div class="legend-card__scale">
+            <span id="legend-max">1.000</span>
+            <div id="legend-bar" class="legend-card__bar"></div>
+            <span id="legend-mid">0.500</span>
+            <span id="legend-min">0.000</span>
+          </div>
+        </section>
+
+        <section class="legend-card legend-card--status">
+          <div class="legend-card__header">
+            <p class="eyebrow">Scene Status</p>
+            <h2>Engine</h2>
+          </div>
+          <div id="status-pill" class="status-pill">Awaiting OBJ input</div>
+        </section>
+      </aside>
+
+      <footer class="bottom-dock">
+        <div class="dock-item">
+          <span class="dock-item__label">Projection</span>
+          <strong>Orthographic</strong>
+        </div>
+        <div class="dock-item">
+          <span class="dock-item__label">Render Quality</span>
+          <strong id="quality-status">High</strong>
+        </div>
+        <div class="dock-item">
+          <span class="dock-item__label">FPS</span>
+          <strong id="fps-value">0</strong>
+        </div>
+        <div class="dock-item">
+          <span class="dock-item__label">Current Mode</span>
+          <strong id="mode-status">Heatmap</strong>
+        </div>
+        <div class="dock-item">
+          <span class="dock-item__label">Hover Elevation</span>
+          <strong id="hover-z-value">—</strong>
+        </div>
+        <div class="dock-item">
+          <span class="dock-item__label">Canvas Size</span>
+          <strong id="canvas-size-value">0 × 0</strong>
+        </div>
+      </footer>
+
+      <div id="probe-tooltip" class="probe-tooltip hidden" role="status" aria-live="polite">
+        <span class="probe-tooltip__label">Elevation (Z)</span>
+        <strong id="probe-tooltip-value">0.000</strong>
+      </div>
+
+      <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+    </div>
+
+    <script type="module" src="./ui.js"></script>
+  </body>
+</html>
