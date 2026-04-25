@@ -74,6 +74,7 @@ body {
 
 body {
   overflow: hidden;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.9), transparent 30%),
     radial-gradient(circle at 100% 8%, rgba(211, 225, 255, 0.7), transparent 24%),
@@ -106,8 +107,11 @@ select {
 
 .app-shell {
   position: relative;
-  width: 100vw;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   height: 100vh;
+  height: 100dvh;
 }
 
 .viewport {
@@ -116,6 +120,7 @@ select {
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
 }
 
 .topbar,
@@ -261,6 +266,7 @@ select {
   flex-direction: column;
   gap: 12px;
   overflow: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
   z-index: 7;
 }
@@ -719,6 +725,7 @@ input[type="range"]::-moz-range-thumb {
   position: fixed;
   z-index: 12;
   min-width: 132px;
+  max-width: min(260px, calc(100vw - 24px));
   padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid var(--border);
@@ -780,16 +787,28 @@ input[type="range"]::-moz-range-thumb {
 
 @media (max-width: 1120px) {
   body {
-    overflow: auto;
+    overflow-y: auto;
   }
 
   .app-shell {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    padding:
+      calc(14px + env(safe-area-inset-top))
+      14px
+      calc(14px + env(safe-area-inset-bottom))
+      14px;
     min-height: 100vh;
+    min-height: 100dvh;
     height: auto;
   }
 
   .viewport {
     position: fixed;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
   }
 
   .side-panel,
@@ -800,54 +819,135 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .topbar {
-    left: auto;
-    right: auto;
-    top: auto;
-    margin: 14px;
+    min-height: 64px;
+    padding: 14px 16px;
+    margin: 0;
   }
 
   .side-panel,
   .legend-panel {
-    top: auto;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    width: auto;
-    margin: 0 14px 14px;
+    width: 100%;
+    max-width: 760px;
+    margin: 0;
   }
 
   .legend-panel {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
   }
 
   .bottom-dock {
-    left: auto;
-    right: auto;
-    bottom: auto;
-    margin: 0 14px 14px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-height: 0;
+    padding: 12px;
+    margin: 0;
   }
 
   .toast-region {
     position: fixed;
     bottom: 16px;
+    right: 16px;
+  }
+
+  .legend-card,
+  .legend-card--status {
+    width: auto;
+  }
+
+  .dock-item {
+    min-height: 72px;
+    border-right: none;
+    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .topbar {
     height: auto;
     align-items: flex-start;
     flex-direction: column;
-    padding: 14px;
   }
 
-  .topbar__actions,
-  .button-row,
+  .topbar__brand,
+  .topbar__actions {
+    width: 100%;
+  }
+
+  .topbar__actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .brand-copy p {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.45;
+  }
+
+  .button-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .toggle-grid,
   .metadata-grid,
   .bottom-dock {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  body::before {
+    background-size: 44px 44px;
+  }
+
+  .app-shell {
+    gap: 10px;
+    padding:
+      calc(10px + env(safe-area-inset-top))
+      10px
+      calc(10px + env(safe-area-inset-bottom))
+      10px;
+  }
+
+  .topbar {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .topbar__brand {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .brand-copy h1 {
+    font-size: 1.38rem;
+  }
+
+  .topbar__actions {
     width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 38px) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .topbar__actions .button-primary {
+    min-width: 0;
+  }
+
+  .panel-card,
+  .legend-card {
+    padding: 14px;
   }
 
   .button-row,
@@ -855,14 +955,54 @@ input[type="range"]::-moz-range-thumb {
   .metadata-grid,
   .bottom-dock {
     grid-template-columns: 1fr;
-    flex-direction: column;
   }
 
   .legend-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .field__label {
+    align-items: flex-start;
     flex-direction: column;
   }
 
-  .legend-card {
-    width: auto;
+  .toast-region {
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .toast {
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-row {
+    gap: 8px;
+  }
+
+  .brand-copy h1 {
+    font-size: 1.22rem;
+  }
+
+  .pill {
+    min-height: 22px;
+    padding: 0 8px;
+    font-size: 0.7rem;
+  }
+
+  .drop-zone {
+    padding: 16px 12px;
+  }
+
+  .legend-card__scale {
+    min-height: 156px;
+    gap: 8px 10px;
+  }
+
+  .dock-item {
+    min-height: 0;
   }
 }

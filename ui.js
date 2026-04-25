@@ -154,6 +154,14 @@ class InteractionController {
     this.inertiaY = 0;
     this.lastClientX = 0;
     this.lastClientY = 0;
+    this.activePointers = new Map();
+    this.touchGesture = {
+      active: false,
+      distance: 0,
+      centerX: 0,
+      centerY: 0,
+      zoom: camera.zoom,
+    };
     this.settleTimer = null;
     this.callbacks = {
       onReset: null,
@@ -180,6 +188,7 @@ class InteractionController {
     this.canvas.addEventListener("pointerdown", (event) => this.handlePointerDown(event));
     this.canvas.addEventListener("pointermove", (event) => this.handlePointerMove(event));
     this.canvas.addEventListener("pointerup", (event) => this.handlePointerUp(event));
+    this.canvas.addEventListener("pointercancel", (event) => this.handlePointerUp(event));
     this.canvas.addEventListener("pointerleave", () => this.handlePointerLeave());
     this.canvas.addEventListener("wheel", (event) => this.handleWheel(event), { passive: false });
     this.canvas.addEventListener("dblclick", () => {
@@ -192,11 +201,106 @@ class InteractionController {
     window.addEventListener("keyup", (event) => this.handleKeyUp(event));
   }
 
+  updateActivePointer(event) {
+    if (event.pointerType !== "touch") {
+      return;
+    }
+
+    this.activePointers.set(event.pointerId, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+  }
+
+  removeActivePointer(event) {
+    if (event.pointerType !== "touch") {
+      return;
+    }
+
+    this.activePointers.delete(event.pointerId);
+  }
+
+  getTouchPoints() {
+    return Array.from(this.activePointers.values());
+  }
+
+  getTouchMetrics() {
+    const touchPoints = this.getTouchPoints();
+    if (touchPoints.length < 2) {
+      return null;
+    }
+
+    const [first, second] = touchPoints;
+    const dx = second.clientX - first.clientX;
+    const dy = second.clientY - first.clientY;
+
+    return {
+      distance: Math.max(1, Math.hypot(dx, dy)),
+      centerX: (first.clientX + second.clientX) * 0.5,
+      centerY: (first.clientY + second.clientY) * 0.5,
+    };
+  }
+
+  beginTouchGesture() {
+    const metrics = this.getTouchMetrics();
+    if (!metrics) {
+      return false;
+    }
+
+    this.touchGesture.active = true;
+    this.touchGesture.distance = metrics.distance;
+    this.touchGesture.centerX = metrics.centerX;
+    this.touchGesture.centerY = metrics.centerY;
+    this.touchGesture.zoom = this.targetZoom;
+    this.isDragging = false;
+    this.isPanning = true;
+    this.inertiaX = 0;
+    this.inertiaY = 0;
+    return true;
+  }
+
+  resetTouchGesture() {
+    this.touchGesture.active = false;
+    this.touchGesture.distance = 0;
+    this.touchGesture.centerX = 0;
+    this.touchGesture.centerY = 0;
+    this.touchGesture.zoom = this.targetZoom;
+  }
+
+  handleTouchGestureMove() {
+    const metrics = this.getTouchMetrics();
+    if (!metrics) {
+      return false;
+    }
+
+    if (!this.touchGesture.active) {
+      return this.beginTouchGesture();
+    }
+
+    const scale = metrics.distance / Math.max(1, this.touchGesture.distance);
+    const dx = metrics.centerX - this.touchGesture.centerX;
+    const dy = metrics.centerY - this.touchGesture.centerY;
+
+    this.targetZoom = clamp(this.touchGesture.zoom * scale, 0.35, 3);
+    this.targetPanX += dx * 0.0028;
+    this.targetPanY -= dy * 0.0028;
+    this.touchGesture.centerX = metrics.centerX;
+    this.touchGesture.centerY = metrics.centerY;
+    this.scene.markDirty("touch-gesture");
+    return true;
+  }
+
   handlePointerDown(event) {
     this.canvas.setPointerCapture?.(event.pointerId);
     this.pointer.inside = true;
     this.pointer.clientX = event.clientX;
     this.pointer.clientY = event.clientY;
+
+    if (event.pointerType === "touch") {
+      event.preventDefault();
+      this.updateActivePointer(event);
+    }
+
     this.isDragging = true;
     this.isPanning = event.shiftKey;
     this.lastClientX = event.clientX;
@@ -204,6 +308,11 @@ class InteractionController {
     this.inertiaX = 0;
     this.inertiaY = 0;
     this.scene.beginInteraction();
+
+    if (event.pointerType === "touch" && this.getTouchPoints().length >= 2) {
+      this.beginTouchGesture();
+    }
+
     if (this.settleTimer) {
       window.clearTimeout(this.settleTimer);
     }
@@ -213,6 +322,16 @@ class InteractionController {
     this.pointer.inside = true;
     this.pointer.clientX = event.clientX;
     this.pointer.clientY = event.clientY;
+
+    if (event.pointerType === "touch") {
+      event.preventDefault();
+      this.updateActivePointer(event);
+
+      if (this.getTouchPoints().length >= 2) {
+        this.handleTouchGestureMove();
+        return;
+      }
+    }
 
     if (!this.isDragging) {
       return;
@@ -239,12 +358,39 @@ class InteractionController {
 
   handlePointerUp(event) {
     this.canvas.releasePointerCapture?.(event.pointerId);
+    this.removeActivePointer(event);
+
+    if (event.pointerType === "touch") {
+      const remainingTouches = this.getTouchPoints();
+      if (remainingTouches.length < 2) {
+        this.resetTouchGesture();
+      }
+
+      if (remainingTouches.length === 1) {
+        const [touch] = remainingTouches;
+        this.pointer.inside = true;
+        this.pointer.clientX = touch.clientX;
+        this.pointer.clientY = touch.clientY;
+        this.lastClientX = touch.clientX;
+        this.lastClientY = touch.clientY;
+        this.isDragging = true;
+        this.isPanning = false;
+        return;
+      }
+
+      if (remainingTouches.length === 0) {
+        this.pointer.inside = false;
+      }
+    }
+
     this.isDragging = false;
     this.isPanning = false;
     this.scheduleInteractionEnd();
   }
 
   handlePointerLeave() {
+    this.activePointers.clear();
+    this.resetTouchGesture();
     this.pointer.inside = false;
     this.isDragging = false;
     this.isPanning = false;
